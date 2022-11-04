@@ -79,14 +79,9 @@ public class RealocarSelo {
 
     //***********************************************RemoverSelo*******************************************
 
-    public static byte[] removerSelo(String path) throws IOException {
+    public static void substituirSelo(String pdfPath, String pngPath, String fullName) throws IOException {
 
-        String name = new File(path).getName();
-        name = name.substring(0, name.lastIndexOf("."));
-
-        System.out.println("Title: " + name);
-
-        PDDocument doc = PDDocument.load(new File(path));
+        PDDocument doc = PDDocument.load(new File(pdfPath));
         doc.setAllSecurityToBeRemoved(true);
 
         PDDocumentCatalog catalog = doc.getDocumentCatalog();
@@ -99,6 +94,8 @@ public class RealocarSelo {
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
             cleanPage(doc.getPage(i));
         }
+        List<Object> coordinates = getCoordinates(doc, fullName);
+        doc = colocarImagem(doc, pngPath, (Integer) coordinates.get(0), (float) coordinates.get(1));
         COSDictionary dictionary = doc.getDocumentCatalog().getCOSObject();
         dictionary.setNeedToBeUpdated(true);
         dictionary = (COSDictionary) dictionary.getDictionaryObject(COSName.ACRO_FORM);
@@ -120,11 +117,13 @@ public class RealocarSelo {
             }
             page.getCOSObject().setNeedToBeUpdated(true);
         }
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        doc.saveIncremental(byteArrayOutputStream);
-        doc.close();
-        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
-        return pdfbytes;
+//        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+//        doc.saveIncremental(byteArrayOutputStream);
+//        doc.close();
+//        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
+//        return pdfbytes;
+        OutputStream outPath = new FileOutputStream(new File("/home/douglas/Documentos/ata3.pdf"));
+        doc.saveIncremental(outPath);
     }
 
     public static void cleanPage(PDPage page) throws IOException {
@@ -138,34 +137,28 @@ public class RealocarSelo {
             tokens.remove((int) i);
         }
     }
-//************************************************Colocar imagem****************************************************
-    public static void colocarImagem(String PDFPath, String PNGPath, Integer pageNumber, float y) throws IOException {
-        //Loading an existing document
-        File file = new File(PDFPath);
-        PDDocument doc = PDDocument.load(file);
+
+    //************************************************Colocar imagem****************************************************
+    public static PDDocument colocarImagem(PDDocument doc, String pngPath, Integer pageNumber, float coordY) throws IOException {
 
         //Retrieving the page
-        PDPage page = doc.getPage(pageNumber);
+        PDPage page = doc.getPage(pageNumber-1);
+        System.out.println(page.getMediaBox().getHeight());
 
         //Creating PDImageXObject object
-        PDImageXObject pdImage = PDImageXObject.createFromFile(PNGPath,doc);
+        PDImageXObject pdImage = PDImageXObject.createFromFile(pngPath, doc);
 
         //creating the PDPageContentStream object
         PDPageContentStream contents = new PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true);
 
         //Drawing the image in the PDF document
-        contents.drawImage(pdImage, 300, y-60);
+        contents.drawImage(pdImage, 350, page.getMediaBox().getHeight() - coordY - 16);
 
         System.out.println("Image inserted");
 
-        //Closing the PDPageContentStream object
         contents.close();
 
-        //Saving the document
-        doc.save("/home/residencia/Documentos/ataPicture.pdf");
-
-        //Closing the document
-        doc.close();
+        return doc;
     }
 }
 
