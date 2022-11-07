@@ -36,7 +36,24 @@ public class RealocarSelo {
         }
 
         for (Integer page = participacoesPage; page <= document.getNumberOfPages(); page++) {
-            List<TextPositionSequence> hits = findWords(document, page, searchTerm);
+            List<TextPositionSequence> hits = new ArrayList<>();
+            String searchTermSplitted = searchTerm;
+            System.out.println("aqui "+searchTerm);
+            String searchTermSplitted2 = "";
+            while(hits.size() <= 0) {
+                String[] searchTermList = searchTermSplitted.split(" ");
+                hits = findWords(document, page, searchTermSplitted);
+                for (int i = 0; i < searchTermList.length-1; i++) {
+                    if (i == 0) {
+                        searchTermSplitted2 = searchTermSplitted2 + searchTermList[i];
+                    }
+                    else {
+                        searchTermSplitted2 = searchTermSplitted2+" "+searchTermList[i];
+                    }
+                }
+                searchTermSplitted = searchTermSplitted2;
+                searchTermSplitted2 = "";
+            }
             if (page.equals(participacoesPage)) {
                 for (TextPositionSequence hit : hits) {
                     if (hits.size() >= 1 && hit.getY() >= participacoesY) {
@@ -128,7 +145,7 @@ public class RealocarSelo {
 //        doc.close();
 //        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
 //        return pdfbytes;
-        OutputStream outPath = new FileOutputStream(new File("/home/douglas/Documentos/ata3.pdf"));
+        OutputStream outPath = new FileOutputStream(new File("/home/residencia/Documentos/ata3.pdf"));
         doc.saveIncremental(outPath);
     }
 

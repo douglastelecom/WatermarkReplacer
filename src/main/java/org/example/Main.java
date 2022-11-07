@@ -5,6 +5,6 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        RealocarSelo.substituirSelo("/home/douglas/Documentos/ata3.pdf", "/home/douglas/Imagens/selo.png", "DOUGLAS FERNANDES DOS SANTOS");
+        RealocarSelo.substituirSelo("/home/residencia/Documentos/ata.pdf", "/home/residencia/Imagens/selo.png", "GELLY SABRINA HONORIO DE MELO REGES");
     }
 }
