@@ -6,7 +6,6 @@ import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.*;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
@@ -20,14 +19,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RealocarSelo {
+public class Stamp {
     //****************************************Coordenadas****************************************
-    public static List<Object> getCoordinates(PDDocument document, String searchTerm) throws IOException {
+    public static List<Object> getCoordinates(PDDocument document, String searchTerm, String startAt, String endAt) throws IOException {
         List<Object> coordinates = new ArrayList<>();
         float participacoesY = 0;
         Integer participacoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<TextPositionSequence> hits = findWords(document, page, "4. Participações");
+            List<StampHelper> hits = findWords(document, page, startAt);
             if (hits.size() >= 1) {
                 participacoesY = hits.get(0).getY();
                 participacoesPage = page;
@@ -36,19 +35,17 @@ public class RealocarSelo {
         }
         Integer discussoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<TextPositionSequence> hits = findWords(document, page, "5. Itens de discussão");
+            List<StampHelper> hits = findWords(document, page, endAt);
             if (hits.size() >= 1) {
                 discussoesPage = page;
                 break;
             }
         }
-        List<TextPositionSequence> hits = new ArrayList<>();
-        String searchTermSplitted = searchTerm;
-        while (hits.size() <= 0) {
             for (Integer page = participacoesPage; page <= discussoesPage; page++) {
-                hits = findWords(document, page, searchTermSplitted);
+                List<StampHelper> hits = new ArrayList<>();
+                hits = findWords(document, page, searchTerm);
                 if (page.equals(participacoesPage)) {
-                    for (TextPositionSequence hit : hits) {
+                    for (StampHelper hit : hits) {
                         if (hits.size() >= 1 && hit.getY() >= participacoesY) {
                             coordinates.add(0, page);
                             coordinates.add(1, hit.getY());
@@ -56,7 +53,7 @@ public class RealocarSelo {
                         }
                     }
                 } else {
-                    for (TextPositionSequence hit : hits) {
+                    for (StampHelper hit : hits) {
                         if (hits.size() >= 1) {
                             coordinates.add(0, page);
                             coordinates.add(1, hit.getY());
@@ -65,30 +62,19 @@ public class RealocarSelo {
                     }
                 }
 
-                String searchTermSplitted2 = "";
-                String[] searchTermList = searchTermSplitted.split(" ");
-                for (int i = 0; i < searchTermList.length - 1; i++) {
-                    if (i == 0) {
-                        searchTermSplitted2 = searchTermSplitted2 + searchTermList[i];
-                    } else {
-                        searchTermSplitted2 = searchTermSplitted2 + " " + searchTermList[i];
-                    }
-                }
-                searchTermSplitted = searchTermSplitted2;
-
             }
 
-        }
+
 
         return coordinates;
     }
 
-    static List<TextPositionSequence> findWords(PDDocument document, int page, String searchTerm) throws IOException {
-        final List<TextPositionSequence> hits = new ArrayList<TextPositionSequence>();
+    static List<StampHelper> findWords(PDDocument document, int page, String searchTerm) throws IOException {
+        final List<StampHelper> hits = new ArrayList<StampHelper>();
         PDFTextStripper stripper = new PDFTextStripper() {
             @Override
             protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
-                TextPositionSequence word = new TextPositionSequence(textPositions);
+                StampHelper word = new StampHelper(textPositions);
                 String string = word.toString();
 
                 int fromIndex = 0;
@@ -110,7 +96,7 @@ public class RealocarSelo {
 
     //***********************************************RemoverSelo*******************************************
 
-    public static void substituirSelo(String pdfPath, String pngPath, String fullName) throws IOException {
+    public static PDDocument stampRemover(String pdfPath) throws IOException {
 
         PDDocument doc = PDDocument.load(new File(pdfPath));
         doc.setAllSecurityToBeRemoved(true);
@@ -125,8 +111,8 @@ public class RealocarSelo {
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
             cleanPage(doc.getPage(i));
         }
-        List<Object> coordinates = getCoordinates(doc, fullName);
-        doc = colocarImagem(doc, fullName, pngPath, (Integer) coordinates.get(0), (float) coordinates.get(1));
+//        List<Object> coordinates = getCoordinates(doc, fullName);
+//        doc = stamping(doc, fullName, pngPath, (Integer) coordinates.get(0), (float) coordinates.get(1));
         COSDictionary dictionary = doc.getDocumentCatalog().getCOSObject();
         dictionary.setNeedToBeUpdated(true);
         dictionary = (COSDictionary) dictionary.getDictionaryObject(COSName.ACRO_FORM);
@@ -153,8 +139,7 @@ public class RealocarSelo {
 //        doc.close();
 //        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
 //        return pdfbytes;
-        OutputStream outPath = new FileOutputStream(new File("src/resource/ataSelada.pdf"));
-        doc.saveIncremental(outPath);
+        return doc;
     }
 
     public static void cleanPage(PDPage page) throws IOException {
@@ -170,7 +155,7 @@ public class RealocarSelo {
     }
 
     //************************************************Colocar imagem****************************************************
-    public static PDDocument colocarImagem(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY) throws IOException {
+    public static void stamping(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY) throws IOException {
 
         String[] names = fullName.split(" ");
         String fullNameLowerCase = "";
@@ -252,7 +237,9 @@ public class RealocarSelo {
 
         contents.close();
 
-        return doc;
+        OutputStream outPath = new FileOutputStream(new File("src/resource/ataSelada.pdf"));
+        doc.saveIncremental(outPath);
+        doc.close();
     }
 }
 
