@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
+import org.apache.pdfbox.util.Matrix;
 
 import java.io.*;
 import java.time.LocalDate;
@@ -21,12 +22,12 @@ import java.util.List;
 
 public class Stamp {
     //****************************************Coordenadas****************************************
-    public static List<Object> getCoordinates(PDDocument document, String searchTerm, String startAt, String endAt) throws IOException {
+    public static List<Object> getCoordinates(PDDocument document, String searchTerm, String startAt, String endAt, String exclude) throws IOException {
         List<Object> coordinates = new ArrayList<>();
         float participacoesY = 0;
         Integer participacoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<StampHelper> hits = findWords(document, page, startAt);
+            List<StampHelper> hits = findWords(document, page, startAt, exclude);
             if (hits.size() >= 1) {
                 participacoesY = hits.get(0).getY();
                 participacoesPage = page;
@@ -35,7 +36,7 @@ public class Stamp {
         }
         Integer discussoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<StampHelper> hits = findWords(document, page, endAt);
+            List<StampHelper> hits = findWords(document, page, endAt, exclude);
             if (hits.size() >= 1) {
                 discussoesPage = page;
                 break;
@@ -43,12 +44,13 @@ public class Stamp {
         }
             for (Integer page = participacoesPage; page <= discussoesPage; page++) {
                 List<StampHelper> hits = new ArrayList<>();
-                hits = findWords(document, page, searchTerm);
+                hits = findWords(document, page, searchTerm, exclude);
                 if (page.equals(participacoesPage)) {
                     for (StampHelper hit : hits) {
                         if (hits.size() >= 1 && hit.getY() >= participacoesY) {
                             coordinates.add(0, page);
-                            coordinates.add(1, hit.getY());
+                            float average = (hit.textPositionAt(hit.length()-1).getY()+hit.textPositionAt(0).getY())/2.0f;
+                            coordinates.add(1, average);
                             return coordinates;
                         }
                     }
@@ -56,7 +58,8 @@ public class Stamp {
                     for (StampHelper hit : hits) {
                         if (hits.size() >= 1) {
                             coordinates.add(0, page);
-                            coordinates.add(1, hit.getY());
+                            float average = (hit.textPositionAt(hit.length()-1).getY()+hit.textPositionAt(0).getY())/2.0f;
+                            coordinates.add(1, average);
                             return coordinates;
                         }
                     }
@@ -69,21 +72,35 @@ public class Stamp {
         return coordinates;
     }
 
-    static List<StampHelper> findWords(PDDocument document, int page, String searchTerm) throws IOException {
-        final List<StampHelper> hits = new ArrayList<StampHelper>();
-        PDFTextStripper stripper = new PDFTextStripper() {
+    static List<StampHelper> findWords(PDDocument document, int page, String searchTerm, String exclude) throws IOException
+    {
+        final List<TextPosition> allTextPositions = new ArrayList<>();
+        PDFTextStripper stripper = new PDFTextStripper()
+        {
             @Override
-            protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
-                StampHelper word = new StampHelper(textPositions);
-                String string = word.toString();
-
-                int fromIndex = 0;
-                int index;
-                while ((index = string.indexOf(searchTerm, fromIndex)) > -1) {
-                    hits.add(word.subSequence(index, index + searchTerm.length()));
-                    fromIndex = index + 1;
-                }
+            protected void writeString(String text, List<TextPosition> textPositions) throws IOException
+            {
+                if(!text.equals(exclude))
+                allTextPositions.addAll(textPositions);
+                System.out.println(text);
                 super.writeString(text, textPositions);
+            }
+
+            @Override
+            protected void writeLineSeparator() throws IOException {
+                if (!allTextPositions.isEmpty()) {
+                    TextPosition last = allTextPositions.get(allTextPositions.size() - 1);
+                    if (!" ".equals(last.getUnicode())) {
+                        Matrix textMatrix = last.getTextMatrix().clone();
+                        textMatrix.setValue(2, 0, last.getEndX());
+                        textMatrix.setValue(2, 1, last.getEndY());
+                        TextPosition separatorSpace = new TextPosition(last.getRotation(), last.getPageWidth(), last.getPageHeight(),
+                                textMatrix, last.getEndX(), last.getEndY(), last.getHeight(), 0, last.getWidthOfSpace(), " ",
+                                new int[] {' '}, last.getFont(), last.getFontSize(), (int) last.getFontSizeInPt());
+                        allTextPositions.add(separatorSpace);
+                    }
+                }
+                super.writeLineSeparator();
             }
         };
 
@@ -91,6 +108,19 @@ public class Stamp {
         stripper.setStartPage(page);
         stripper.setEndPage(page);
         stripper.getText(document);
+
+        final List<StampHelper> hits = new ArrayList<StampHelper>();
+        StampHelper word = new StampHelper(allTextPositions);
+        String string = word.toString();
+
+        int fromIndex = 0;
+        int index;
+        while ((index = string.indexOf(searchTerm, fromIndex)) > -1)
+        {
+            hits.add(word.subSequence(index, index + searchTerm.length()));
+            fromIndex = index + 1;
+        }
+
         return hits;
     }
 
