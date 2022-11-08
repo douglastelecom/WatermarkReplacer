@@ -34,44 +34,52 @@ public class RealocarSelo {
                 break;
             }
         }
-
-        for (Integer page = participacoesPage; page <= document.getNumberOfPages(); page++) {
-            List<TextPositionSequence> hits = new ArrayList<>();
-            String searchTermSplitted = searchTerm;
-            System.out.println("aqui "+searchTerm);
-            String searchTermSplitted2 = "";
-            while(hits.size() <= 0) {
-                String[] searchTermList = searchTermSplitted.split(" ");
+        Integer discussoesPage = 0;
+        for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
+            List<TextPositionSequence> hits = findWords(document, page, "5. Itens de discussão");
+            if (hits.size() >= 1) {
+                discussoesPage = page;
+                break;
+            }
+        }
+        List<TextPositionSequence> hits = new ArrayList<>();
+        String searchTermSplitted = searchTerm;
+        while (hits.size() <= 0) {
+            for (Integer page = participacoesPage; page <= discussoesPage; page++) {
                 hits = findWords(document, page, searchTermSplitted);
-                for (int i = 0; i < searchTermList.length-1; i++) {
+                if (page.equals(participacoesPage)) {
+                    for (TextPositionSequence hit : hits) {
+                        if (hits.size() >= 1 && hit.getY() >= participacoesY) {
+                            coordinates.add(0, page);
+                            coordinates.add(1, hit.getY());
+                            return coordinates;
+                        }
+                    }
+                } else {
+                    for (TextPositionSequence hit : hits) {
+                        if (hits.size() >= 1) {
+                            coordinates.add(0, page);
+                            coordinates.add(1, hit.getY());
+                            return coordinates;
+                        }
+                    }
+                }
+
+                String searchTermSplitted2 = "";
+                String[] searchTermList = searchTermSplitted.split(" ");
+                for (int i = 0; i < searchTermList.length - 1; i++) {
                     if (i == 0) {
                         searchTermSplitted2 = searchTermSplitted2 + searchTermList[i];
-                    }
-                    else {
-                        searchTermSplitted2 = searchTermSplitted2+" "+searchTermList[i];
+                    } else {
+                        searchTermSplitted2 = searchTermSplitted2 + " " + searchTermList[i];
                     }
                 }
                 searchTermSplitted = searchTermSplitted2;
-                searchTermSplitted2 = "";
+
             }
-            if (page.equals(participacoesPage)) {
-                for (TextPositionSequence hit : hits) {
-                    if (hits.size() >= 1 && hit.getY() >= participacoesY) {
-                        coordinates.add(0, page);
-                        coordinates.add(1, hit.getY());
-                        return coordinates;
-                    }
-                }
-            } else {
-                for (TextPositionSequence hit : hits) {
-                    if (hits.size() >= 1) {
-                        coordinates.add(0, page);
-                        coordinates.add(1, hit.getY());
-                        return coordinates;
-                    }
-                }
-            }
+
         }
+
         return coordinates;
     }
 
@@ -145,7 +153,7 @@ public class RealocarSelo {
 //        doc.close();
 //        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
 //        return pdfbytes;
-        OutputStream outPath = new FileOutputStream(new File("/home/residencia/Documentos/ata3.pdf"));
+        OutputStream outPath = new FileOutputStream(new File("src/resource/ataSelada.pdf"));
         doc.saveIncremental(outPath);
     }
 
@@ -226,12 +234,12 @@ public class RealocarSelo {
                 lastSpace = spaceIndex;
             }
         }
-        if(lines.size()==3){
-            startY = startY-3;
+        if (lines.size() == 3) {
+            startY = startY - 3;
             leading = 1.35f * fontSize;
-        } else if (lines.size()==5) {
+        } else if (lines.size() == 5) {
             leading = 1f * fontSize;
-            startY = startY+2;
+            startY = startY + 2;
         }
         contents.beginText();
         contents.setFont(pdfFont, fontSize);
