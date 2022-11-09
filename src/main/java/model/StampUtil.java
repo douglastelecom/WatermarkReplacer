@@ -20,14 +20,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Stamp {
+public class StampUtil {
     //****************************************Coordenadas****************************************
     public static List<Object> getCoordinates(PDDocument document, String searchTerm, String startAt, String endAt, String exclude) throws IOException {
         List<Object> coordinates = new ArrayList<>();
         float participacoesY = 0;
         Integer participacoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<StampHelper> hits = findWords(document, page, startAt, exclude);
+            List<TextPositionSequence> hits = findWords(document, page, startAt, exclude);
             if (hits.size() >= 1) {
                 participacoesY = hits.get(0).getY();
                 participacoesPage = page;
@@ -36,53 +36,48 @@ public class Stamp {
         }
         Integer discussoesPage = 0;
         for (Integer page = 1; page <= document.getNumberOfPages(); page++) {
-            List<StampHelper> hits = findWords(document, page, endAt, exclude);
+            List<TextPositionSequence> hits = findWords(document, page, endAt, exclude);
             if (hits.size() >= 1) {
                 discussoesPage = page;
                 break;
             }
         }
-            for (Integer page = participacoesPage; page <= discussoesPage; page++) {
-                List<StampHelper> hits = new ArrayList<>();
-                hits = findWords(document, page, searchTerm, exclude);
-                if (page.equals(participacoesPage)) {
-                    for (StampHelper hit : hits) {
-                        if (hits.size() >= 1 && hit.getY() >= participacoesY) {
-                            coordinates.add(0, page);
-                            float average = (hit.textPositionAt(hit.length()-1).getY()+hit.textPositionAt(0).getY())/2.0f;
-                            coordinates.add(1, average);
-                            return coordinates;
-                        }
-                    }
-                } else {
-                    for (StampHelper hit : hits) {
-                        if (hits.size() >= 1) {
-                            coordinates.add(0, page);
-                            float average = (hit.textPositionAt(hit.length()-1).getY()+hit.textPositionAt(0).getY())/2.0f;
-                            coordinates.add(1, average);
-                            return coordinates;
-                        }
+        for (Integer page = participacoesPage; page <= discussoesPage; page++) {
+            List<TextPositionSequence> hits = new ArrayList<>();
+            hits = findWords(document, page, searchTerm, exclude);
+            if (page.equals(participacoesPage)) {
+                for (TextPositionSequence hit : hits) {
+                    if (hits.size() >= 1 && hit.getY() >= participacoesY) {
+                        coordinates.add(0, page);
+                        float average = (hit.textPositionAt(hit.length() - 1).getY() + hit.textPositionAt(0).getY()) / 2.0f;
+                        coordinates.add(1, average);
+                        return coordinates;
                     }
                 }
-
+            } else {
+                for (TextPositionSequence hit : hits) {
+                    if (hits.size() >= 1) {
+                        coordinates.add(0, page);
+                        float average = (hit.textPositionAt(hit.length() - 1).getY() + hit.textPositionAt(0).getY()) / 2.0f;
+                        coordinates.add(1, average);
+                        return coordinates;
+                    }
+                }
             }
 
+        }
 
 
         return coordinates;
     }
 
-    static List<StampHelper> findWords(PDDocument document, int page, String searchTerm, String exclude) throws IOException
-    {
+    static List<TextPositionSequence> findWords(PDDocument document, int page, String searchTerm, String exclude) throws IOException {
         final List<TextPosition> allTextPositions = new ArrayList<>();
-        PDFTextStripper stripper = new PDFTextStripper()
-        {
+        PDFTextStripper stripper = new PDFTextStripper() {
             @Override
-            protected void writeString(String text, List<TextPosition> textPositions) throws IOException
-            {
-                if(!text.equals(exclude))
-                allTextPositions.addAll(textPositions);
-                System.out.println(text);
+            protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
+                if (!text.equals(exclude))
+                    allTextPositions.addAll(textPositions);
                 super.writeString(text, textPositions);
             }
 
@@ -96,7 +91,7 @@ public class Stamp {
                         textMatrix.setValue(2, 1, last.getEndY());
                         TextPosition separatorSpace = new TextPosition(last.getRotation(), last.getPageWidth(), last.getPageHeight(),
                                 textMatrix, last.getEndX(), last.getEndY(), last.getHeight(), 0, last.getWidthOfSpace(), " ",
-                                new int[] {' '}, last.getFont(), last.getFontSize(), (int) last.getFontSizeInPt());
+                                new int[]{' '}, last.getFont(), last.getFontSize(), (int) last.getFontSizeInPt());
                         allTextPositions.add(separatorSpace);
                     }
                 }
@@ -109,14 +104,13 @@ public class Stamp {
         stripper.setEndPage(page);
         stripper.getText(document);
 
-        final List<StampHelper> hits = new ArrayList<StampHelper>();
-        StampHelper word = new StampHelper(allTextPositions);
+        final List<TextPositionSequence> hits = new ArrayList<TextPositionSequence>();
+        TextPositionSequence word = new TextPositionSequence(allTextPositions);
         String string = word.toString();
 
         int fromIndex = 0;
         int index;
-        while ((index = string.indexOf(searchTerm, fromIndex)) > -1)
-        {
+        while ((index = string.indexOf(searchTerm, fromIndex)) > -1) {
             hits.add(word.subSequence(index, index + searchTerm.length()));
             fromIndex = index + 1;
         }
@@ -126,9 +120,9 @@ public class Stamp {
 
     //***********************************************RemoverSelo*******************************************
 
-    public static PDDocument stampRemover(String pdfPath) throws IOException {
+    public static PDDocument stampRemover(byte[] docByte) throws IOException {
 
-        PDDocument doc = PDDocument.load(new File(pdfPath));
+        PDDocument doc = PDDocument.load(docByte);
         doc.setAllSecurityToBeRemoved(true);
 
         PDDocumentCatalog catalog = doc.getDocumentCatalog();
@@ -164,11 +158,6 @@ public class Stamp {
             }
             page.getCOSObject().setNeedToBeUpdated(true);
         }
-//        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-//        doc.saveIncremental(byteArrayOutputStream);
-//        doc.close();
-//        byte[] pdfbytes = byteArrayOutputStream.toByteArray();
-//        return pdfbytes;
         return doc;
     }
 
@@ -185,7 +174,7 @@ public class Stamp {
     }
 
     //************************************************Colocar imagem****************************************************
-    public static void stamping(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY) throws IOException {
+    public static byte[] stamping(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY) throws IOException {
 
         String[] names = fullName.split(" ");
         String fullNameLowerCase = "";
@@ -264,12 +253,11 @@ public class Stamp {
             contents.newLineAtOffset(0, -leading);
         }
         contents.endText();
-
         contents.close();
-
-        OutputStream outPath = new FileOutputStream(new File("src/resource/ataSelada.pdf"));
-        doc.saveIncremental(outPath);
+        ByteArrayOutputStream docBytes = new ByteArrayOutputStream();
+        doc.saveIncremental(docBytes);
         doc.close();
+        return docBytes.toByteArray();
     }
 }
 

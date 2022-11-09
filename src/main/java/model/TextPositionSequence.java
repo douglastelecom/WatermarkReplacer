@@ -4,14 +4,14 @@ import org.apache.pdfbox.text.TextPosition;
 
 import java.util.List;
 
-public class StampHelper implements CharSequence
+public class TextPositionSequence implements CharSequence
 {
-    public StampHelper(List<TextPosition> textPositions)
+    public TextPositionSequence(List<TextPosition> textPositions)
     {
         this(textPositions, 0, textPositions.size());
     }
 
-    public StampHelper(List<TextPosition> textPositions, int start, int end)
+    public TextPositionSequence(List<TextPosition> textPositions, int start, int end)
     {
         this.textPositions = textPositions;
         this.start = start;
@@ -33,9 +33,9 @@ public class StampHelper implements CharSequence
     }
 
     @Override
-    public StampHelper subSequence(int start, int end)
+    public TextPositionSequence subSequence(int start, int end)
     {
-        return new StampHelper(textPositions, this.start + start, this.start + end);
+        return new TextPositionSequence(textPositions, this.start + start, this.start + end);
     }
 
     @Override
