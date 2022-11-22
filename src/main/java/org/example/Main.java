@@ -17,11 +17,11 @@ public class Main {
         String startLimit = "4. Participações";
         String finalLimit = "5. Itens de discussão";
         String exclude = "SGB";
-        byte[] pdfByte = Files.readAllBytes(new File("src/resource/ata.pdf").toPath());
+        byte[] pdfByte = Files.readAllBytes(new File("src/resource/ataAssinada.pdf").toPath());
         PDDocument doc = StampUtil.stampRemover(pdfByte);
         List<Object> coordinates = StampUtil.getCoordinates(doc,fullName,startLimit,finalLimit, exclude);
         byte[] pdfByte2 = StampUtil.stamping(doc, fullName,"src/resource/selo.png",(Integer) coordinates.get(0), (float) coordinates.get(1));
-        Path pdfPath = Paths.get("src/resource/atas2.pdf");
+        Path pdfPath = Paths.get("src/resource/ataComEstampa.pdf");
         Files.write(pdfPath, pdfByte2);
     }
 }
