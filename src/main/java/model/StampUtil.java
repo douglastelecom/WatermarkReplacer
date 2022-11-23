@@ -9,22 +9,35 @@ import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationRubberStamp;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceDictionary;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceStream;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class StampUtil {
     //****************************************Coordenadas****************************************
+    private static final String SAVE_GRAPHICS_STATE = "q\n";
+    private static final String RESTORE_GRAPHICS_STATE = "Q\n";
+    private static final String CONCATENATE_MATRIX = "cm\n";
+    private static final String XOBJECT_DO = "Do\n";
+    private static final String SPACE = " ";
+    private static final NumberFormat FORMATDECIMAL = NumberFormat.getNumberInstance( Locale.US );
+
     public static List<Object> getCoordinates(PDDocument document, String searchTerm, String startAt, String endAt, String exclude) throws IOException {
         List<Object> coordinates = new ArrayList<>();
         float participacoesY = 0;
@@ -152,8 +165,6 @@ public class StampUtil {
             }
             page.getCOSObject().setNeedToBeUpdated(true);
         }
-        OutputStream output = new FileOutputStream(new File("src/resource/ataSemSelo.pdf"));
-        doc.saveIncremental(output);
         return doc;
     }
 
@@ -166,7 +177,7 @@ public class StampUtil {
     }
 
     //************************************************Colocar imagem****************************************************
-    public static byte[] stamping(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY) throws IOException {
+    public static void stamping(PDDocument doc, String fullName, String pngPath, Integer pageNumber, float coordY ) throws IOException {
 
         String[] names = fullName.split(" ");
         String fullNameLowerCase = "";
@@ -174,20 +185,54 @@ public class StampUtil {
             fullNameLowerCase = fullNameLowerCase + " " + names[i].substring(0, 1).toUpperCase() + names[i].substring(1).toLowerCase();
         }
 
+            PDPage page = doc.getPage(pageNumber-1);
+            page.getCOSObject().setNeedToBeUpdated(true);
+            List<PDAnnotation> annotations = page.getAnnotations();
+            PDAnnotationRubberStamp rubberStamp = new PDAnnotationRubberStamp();
+            // create a PDXObjectImage with the given image file
+            // if you already have the image in a BufferedImage,
+            // call LosslessFactory.createFromImage() instead
+            PDImageXObject ximage = PDImageXObject.createFromFile(pngPath, doc);
+            // define and set the target rectangle
+            float lowerLeftX = 350;
+            float lowerLeftY = page.getMediaBox().getHeight() - coordY-16;
+            float formWidth = 215;
+            float formHeight = 39;
+            float imgWidth = 215;
+            float imgHeight = 39;
 
-        PDPage page = doc.getPage(1);
-        var annotations = page.getAnnotations();
-        PDAnnotationRubberStamp rubberStamp = new PDAnnotationRubberStamp();
-        rubberStamp.setName(PDAnnotationRubberStamp.NAME_TOP_SECRET);
-        rubberStamp.setRectangle(new PDRectangle(200, 100));
-        rubberStamp.setContents("A top secret note");
-        annotations.add(rubberStamp);
-        page.setAnnotations(annotations);
-        PDImageXObject pdImage = PDImageXObject.createFromFile(pngPath, doc);
-        ByteArrayOutputStream docBytes = new ByteArrayOutputStream();
-        doc.saveIncremental(docBytes);
+            PDRectangle rect = new PDRectangle();
+            rect.setLowerLeftX(lowerLeftX);
+            rect.setLowerLeftY(lowerLeftY);
+            rect.setUpperRightX(lowerLeftX + formWidth);
+            rect.setUpperRightY(lowerLeftY + formHeight);
+            // Create a PDFormXObject
+            PDFormXObject form = new PDFormXObject(doc);
+            form.setResources(new PDResources());
+            form.setBBox(rect);
+            form.setFormType(1);
+            // adjust the image to the target rectangle and add it to the stream
+            try (OutputStream os = form.getStream().createOutputStream())
+            {
+                drawXObject(ximage, form.getResources(), os, lowerLeftX, lowerLeftY, imgWidth, imgHeight);
+            }
+            PDAppearanceStream myDic = new PDAppearanceStream(form.getCOSObject());
+            PDAppearanceDictionary appearance = new PDAppearanceDictionary(new COSDictionary());
+            appearance.setNormalAppearance(myDic);
+            rubberStamp.setAppearance(appearance);
+            rubberStamp.setRectangle(rect);
+            // add the new RubberStamp to the document
+            annotations.add(rubberStamp);
+
+
+        OutputStream output = new FileOutputStream(new File("src/resource/ata55.pdf"));
+        doc.saveIncremental(output);
         doc.close();
-        return docBytes.toByteArray();
+//
+//        ByteArrayOutputStream docBytes = new ByteArrayOutputStream();
+//        doc.saveIncremental(docBytes);
+//        doc.close();
+//        return docBytes.toByteArray();
 
 
 //
@@ -269,6 +314,38 @@ public class StampUtil {
 //        doc.saveIncremental(docBytes);
 //        doc.close();
 //        return docBytes.toByteArray();
+    }
+    private static void drawXObject( PDImageXObject xobject, PDResources resources, OutputStream os,
+                              float x, float y, float width, float height ) throws IOException
+    {
+        // This is similar to PDPageContentStream.drawXObject()
+        COSName xObjectId = resources.add(xobject);
+        appendRawCommands( os, SAVE_GRAPHICS_STATE );
+        appendRawCommands( os, FORMATDECIMAL.format( width ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, FORMATDECIMAL.format( 0 ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, FORMATDECIMAL.format( 0 ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, FORMATDECIMAL.format( height ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, FORMATDECIMAL.format( x ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, FORMATDECIMAL.format( y ) );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, CONCATENATE_MATRIX );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, "/" );
+        appendRawCommands( os, xObjectId.getName() );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, XOBJECT_DO );
+        appendRawCommands( os, SPACE );
+        appendRawCommands( os, RESTORE_GRAPHICS_STATE );
+    }
+
+    private static void appendRawCommands(OutputStream os, String commands) throws IOException
+    {
+        os.write( commands.getBytes(StandardCharsets.ISO_8859_1));
     }
 }
 
